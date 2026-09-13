@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { AiAliasSuggestion } from '../../components/AiAliasSuggestion'
 import { CreateIngredientForm } from '../../components/CreateIngredientForm'
 import { MapIngredientForm } from '../../components/MapIngredientForm'
 import { Sheet } from '../../components/Sheet'
 import { db } from '../../db/db'
-import type { Ingredient } from '../../db/types'
+import type { Ingredient, Tier, Unit } from '../../db/types'
 import { addAlias, resolveIngredient } from '../../lib/ingredients'
 import { StockFields, type StockValue } from './StockFields'
 
@@ -14,7 +15,7 @@ interface AddItemSheetProps {
 type Step =
   | { name: 'search' }
   | { name: 'unresolved'; query: string }
-  | { name: 'create'; query: string }
+  | { name: 'create'; query: string; initialName?: string; initialTier?: Tier; initialUnit?: Unit }
   | { name: 'map'; query: string }
   | { name: 'stock'; ingredient: Ingredient; isExisting: boolean }
 
@@ -63,27 +64,43 @@ export function AddItemSheet({ onClose }: AddItemSheetProps) {
   }
 
   if (step.name === 'unresolved') {
+    const query = step.query
     return (
       <Sheet title="Ingredient not found" onClose={onClose}>
-        <p className="mb-4 text-sm text-stone-600">
-          "{step.query}" doesn't match any known ingredient or alias. No new ingredient is created without your
-          confirmation.
-        </p>
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => setStep({ name: 'create', query: step.query })}
-            className="rounded-md border border-green-800 py-2 text-green-800"
-          >
-            Create new ingredient "{step.query}"
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep({ name: 'map', query: step.query })}
-            className="rounded-md border border-stone-300 py-2 text-stone-600"
-          >
-            This is another name for an ingredient I already have
-          </button>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-stone-600">
+            "{query}" doesn't match any known ingredient or alias. No new ingredient is created without your
+            confirmation.
+          </p>
+          <AiAliasSuggestion
+            token={query}
+            onConfirmExisting={async (ingredientId) => {
+              await addAlias(ingredientId, query)
+              const ing = await db.ingredients.get(ingredientId)
+              if (!ing) return
+              const existingStock = await db.pantry.get(ing.id)
+              setStep({ name: 'stock', ingredient: ing, isExisting: Boolean(existingStock) })
+            }}
+            onConfirmNew={(canonicalName, tier, unit) =>
+              setStep({ name: 'create', query, initialName: canonicalName, initialTier: tier, initialUnit: unit })
+            }
+          />
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setStep({ name: 'create', query })}
+              className="rounded-md border border-green-800 py-2 text-green-800"
+            >
+              Create new ingredient "{query}"
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep({ name: 'map', query })}
+              className="rounded-md border border-stone-300 py-2 text-stone-600"
+            >
+              This is another name for an ingredient I already have
+            </button>
+          </div>
         </div>
       </Sheet>
     )
@@ -94,6 +111,9 @@ export function AddItemSheet({ onClose }: AddItemSheetProps) {
       <Sheet title="New ingredient" onClose={onClose}>
         <CreateIngredientForm
           query={step.query}
+          initialName={step.initialName}
+          initialTier={step.initialTier}
+          initialUnit={step.initialUnit}
           onCreated={(ing) => setStep({ name: 'stock', ingredient: ing, isExisting: false })}
         />
       </Sheet>

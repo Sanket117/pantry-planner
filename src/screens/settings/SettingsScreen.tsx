@@ -1,7 +1,21 @@
+import { useEffect, useState } from 'react'
 import { DEFAULT_SETTINGS, setSettings, useSettings } from '../../lib/settings'
+import { getApiKeys, setApiKeys } from '../../lib/llmKeys'
 
 export function SettingsScreen() {
   const settings = useSettings()
+  const [keys, setKeys] = useState({ anthropic: '', groq: '' })
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    getApiKeys().then(setKeys)
+  }, [])
+
+  async function saveKeys() {
+    await setApiKeys(keys)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
@@ -60,6 +74,39 @@ export function SettingsScreen() {
       >
         Reset to defaults
       </button>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-stone-200 bg-white p-3">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-400">AI assist (optional)</h2>
+          <p className="mt-1 text-xs text-stone-400">
+            Everything in this app works fully offline without these. Keys only add AI-suggested ingredient matches
+            and recipe parsing — you always confirm before anything is saved. Stored on this device only.
+          </p>
+        </div>
+        <label className="flex flex-col gap-1 text-sm text-stone-600">
+          Anthropic API key
+          <input
+            type="password"
+            value={keys.anthropic}
+            onChange={(e) => setKeys({ ...keys, anthropic: e.target.value })}
+            placeholder="sk-ant-..."
+            className="rounded-md border border-stone-300 px-3 py-2 font-mono text-xs"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-stone-600">
+          Groq API key
+          <input
+            type="password"
+            value={keys.groq}
+            onChange={(e) => setKeys({ ...keys, groq: e.target.value })}
+            placeholder="gsk_..."
+            className="rounded-md border border-stone-300 px-3 py-2 font-mono text-xs"
+          />
+        </label>
+        <button type="button" onClick={saveKeys} className="rounded-md bg-green-800 py-2 text-sm text-white">
+          {saved ? 'Saved' : 'Save keys'}
+        </button>
+      </div>
     </div>
   )
 }

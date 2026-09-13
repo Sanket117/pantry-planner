@@ -1,5 +1,6 @@
 import { db } from '../db/db'
-import type { Ingredient } from '../db/types'
+import type { Ingredient, Tier, Unit } from '../db/types'
+import { uniqueSlug } from './slug'
 
 export function normalizeToken(raw: string): string {
   return raw.trim().toLowerCase()
@@ -28,4 +29,28 @@ export async function addAlias(ingredientId: string, alias: string): Promise<voi
   const token = normalizeToken(alias)
   if (ingredient.aliases.some((a) => normalizeToken(a) === token)) return
   await db.ingredients.update(ingredientId, { aliases: [...ingredient.aliases, alias.trim()] })
+}
+
+/** Shared by the manual create form and the AI alias suggestion — one write path either way. */
+export async function createIngredient(
+  canonicalName: string,
+  tier: Tier,
+  defaultUnit: Unit,
+  extraAlias?: string,
+): Promise<Ingredient> {
+  const id = await uniqueSlug(canonicalName, async (candidate) => Boolean(await db.ingredients.get(candidate)))
+  const aliases = extraAlias && normalizeToken(extraAlias) !== normalizeToken(canonicalName) ? [extraAlias.trim()] : []
+  const ingredient: Ingredient = {
+    id,
+    canonical_name: canonicalName.trim(),
+    aliases,
+    tier,
+    default_unit: defaultUnit,
+    kcal_per_100g: null,
+    protein_g: null,
+    carb_g: null,
+    fat_g: null,
+  }
+  await db.ingredients.add(ingredient)
+  return ingredient
 }

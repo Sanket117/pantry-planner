@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { db } from '../db/db'
 import type { Ingredient, Tier, Unit } from '../db/types'
-import { normalizeToken } from '../lib/ingredients'
-import { uniqueSlug } from '../lib/slug'
+import { createIngredient } from '../lib/ingredients'
 
 const UNITS: Unit[] = ['g', 'ml', 'piece', 'tbsp']
 
@@ -10,28 +8,25 @@ interface CreateIngredientFormProps {
   query: string
   onCreated: (ingredient: Ingredient) => void
   submitLabel?: string
+  initialName?: string
+  initialTier?: Tier
+  initialUnit?: Unit
 }
 
-export function CreateIngredientForm({ query, onCreated, submitLabel = 'Create and continue' }: CreateIngredientFormProps) {
-  const [name, setName] = useState(query)
-  const [tier, setTier] = useState<Tier>('perishable')
-  const [unit, setUnit] = useState<Unit>('g')
+export function CreateIngredientForm({
+  query,
+  onCreated,
+  submitLabel = 'Create and continue',
+  initialName,
+  initialTier = 'perishable',
+  initialUnit = 'g',
+}: CreateIngredientFormProps) {
+  const [name, setName] = useState(initialName ?? query)
+  const [tier, setTier] = useState<Tier>(initialTier)
+  const [unit, setUnit] = useState<Unit>(initialUnit)
 
   async function create() {
-    const id = await uniqueSlug(name, async (candidate) => Boolean(await db.ingredients.get(candidate)))
-    const aliases = normalizeToken(name) === normalizeToken(query) ? [] : [query]
-    const ingredient: Ingredient = {
-      id,
-      canonical_name: name.trim(),
-      aliases,
-      tier,
-      default_unit: unit,
-      kcal_per_100g: null,
-      protein_g: null,
-      carb_g: null,
-      fat_g: null,
-    }
-    await db.ingredients.add(ingredient)
+    const ingredient = await createIngredient(name, tier, unit, query)
     onCreated(ingredient)
   }
 
