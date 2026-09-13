@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DbCheck } from './screens/DbCheck'
 import { Placeholder } from './screens/Placeholder'
+import { PantryScreen } from './screens/pantry/PantryScreen'
+import { seedIfEmpty } from './db/seed'
 
 type Tab = 'today' | 'week' | 'pantry' | 'more'
 
@@ -12,14 +14,18 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 function App() {
-  const [tab, setTab] = useState<Tab>('today')
+  const [tab, setTab] = useState<Tab>('pantry')
+
+  useEffect(() => {
+    seedIfEmpty()
+  }, [])
 
   return (
     <div className="flex min-h-svh flex-col bg-stone-50">
       <main className="flex flex-1 flex-col overflow-y-auto pb-16">
         {tab === 'today' && <Placeholder title="Today" phase="Phase 4" />}
         {tab === 'week' && <Placeholder title="Week" phase="Phase 3" />}
-        {tab === 'pantry' && <Placeholder title="Pantry" phase="Phase 2" />}
+        {tab === 'pantry' && <PantryScreen />}
         {tab === 'more' && <DbCheck />}
       </main>
 
