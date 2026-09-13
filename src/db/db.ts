@@ -20,6 +20,13 @@ export class PantryDB extends Dexie {
       plan_entries: 'id, date, [date+slot]',
       cook_log: 'id, plan_entry_id',
     })
+
+    // IndexedDB keys can't be booleans, so `active` was never actually
+    // indexed under v1 — drop it from the index list to avoid relying on
+    // silently-broken query behavior (filter with .toArray() instead).
+    this.version(2).stores({
+      recipes: 'id',
+    })
   }
 }
 

@@ -61,6 +61,7 @@ describe('PantryDB schema', () => {
       recipe_id: 'paneer-bhurji',
       status: 'planned',
       servings_made: null,
+      locked: false,
     })
 
     await db.cook_log.add({

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { DbCheck } from './screens/DbCheck'
-import { Placeholder } from './screens/Placeholder'
+import { MoreScreen } from './screens/MoreScreen'
 import { PantryScreen } from './screens/pantry/PantryScreen'
+import { TodayScreen } from './screens/today/TodayScreen'
+import { WeekScreen } from './screens/week/WeekScreen'
 import { seedIfEmpty } from './db/seed'
 
 type Tab = 'today' | 'week' | 'pantry' | 'more'
@@ -14,7 +15,7 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 function App() {
-  const [tab, setTab] = useState<Tab>('pantry')
+  const [tab, setTab] = useState<Tab>('today')
 
   useEffect(() => {
     seedIfEmpty()
@@ -23,10 +24,10 @@ function App() {
   return (
     <div className="flex min-h-svh flex-col bg-stone-50">
       <main className="flex flex-1 flex-col overflow-y-auto pb-16">
-        {tab === 'today' && <Placeholder title="Today" phase="Phase 4" />}
-        {tab === 'week' && <Placeholder title="Week" phase="Phase 3" />}
+        {tab === 'today' && <TodayScreen />}
+        {tab === 'week' && <WeekScreen />}
         {tab === 'pantry' && <PantryScreen />}
-        {tab === 'more' && <DbCheck />}
+        {tab === 'more' && <MoreScreen />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-stone-200 bg-white">

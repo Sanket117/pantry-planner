@@ -54,6 +54,7 @@ export interface PlanEntry {
   recipe_id: string
   status: PlanStatus
   servings_made: number | null
+  locked: boolean
 }
 
 export interface CookLogDeduction {
