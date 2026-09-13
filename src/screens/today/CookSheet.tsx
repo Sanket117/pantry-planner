@@ -14,6 +14,7 @@ interface CookSheetProps {
 export function CookSheet({ entry, recipe, onClose }: CookSheetProps) {
   const [servings, setServings] = useState(recipe.servings)
   const [shortfalls, setShortfalls] = useState<string[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const shortfallIngredients = useLiveQuery(
     async () => (shortfalls ? db.ingredients.bulkGet(shortfalls) : []),
@@ -21,8 +22,13 @@ export function CookSheet({ entry, recipe, onClose }: CookSheetProps) {
   )
 
   async function confirmCook() {
-    const result = await cookMeal(entry.id, servings)
-    setShortfalls(result.shortfalls)
+    setError(null)
+    try {
+      const result = await cookMeal(entry.id, servings)
+      setShortfalls(result.shortfalls)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not mark this cooked.')
+    }
   }
 
   if (shortfalls) {
@@ -61,6 +67,7 @@ export function CookSheet({ entry, recipe, onClose }: CookSheetProps) {
             className="w-20 rounded-md border border-stone-300 px-2 py-1"
           />
         </label>
+        {error && <p className="text-sm text-red-700">{error}</p>}
         <button type="button" onClick={confirmCook} className="rounded-md bg-green-800 py-2 text-white">
           Confirm cooked
         </button>

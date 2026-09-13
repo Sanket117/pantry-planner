@@ -12,15 +12,34 @@ export function TodayScreen() {
   const cells = useWeekEntries([today])
   const [viewingSteps, setViewingSteps] = useState<Recipe | null>(null)
   const [cooking, setCooking] = useState<{ entry: PlanEntry; recipe: Recipe } | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function undo(entry: PlanEntry) {
-    const log = await db.cook_log.where('plan_entry_id').equals(entry.id).first()
-    if (log) await undoCook(log.id)
+    setError(null)
+    try {
+      const log = await db.cook_log.where('plan_entry_id').equals(entry.id).first()
+      if (!log) {
+        setError("Couldn't find the record of that cook — nothing to undo.")
+        return
+      }
+      await undoCook(log.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not undo that.')
+    }
   }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
       <h1 className="text-lg font-semibold text-stone-800">Today</h1>
+
+      {error && (
+        <div className="flex items-start justify-between gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="text-red-500">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
         {cells?.map((cell) => (

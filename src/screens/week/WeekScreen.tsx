@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/db'
 import type { MealSlot, PlanEntry } from '../../db/types'
 import { formatDayLabel, isoDate, weekDatesFrom } from '../../lib/dates'
@@ -13,13 +14,28 @@ export function WeekScreen() {
   const weekDates = useMemo(() => weekDatesFrom(weekStart), [weekStart])
   const cells = useWeekEntries(weekDates)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [genSummary, setGenSummary] = useState<string | null>(null)
+
+  const activeRecipeCount = useLiveQuery(
+    async () => (await db.recipes.toArray()).filter((r) => r.active).length,
+    [],
+  )
 
   const hasAnyEntries = cells?.some((c) => c.entry) ?? false
 
   async function regenerate() {
     setBusy(true)
+    setError(null)
+    setGenSummary(null)
     try {
       const inputs = await loadPlannerInputs()
+
+      if (inputs.activeRecipes.length === 0) {
+        setGenSummary('No recipes yet. Add at least one in More → Recipes, then generate again.')
+        return
+      }
+
       const existing = await db.plan_entries.where('date').anyOf(weekDates).toArray()
       const pastEntries = await db.plan_entries.where('date').below(weekStart).toArray()
       const preservedEntries = existing.filter((e) => e.locked || e.status === 'cooked')
@@ -42,22 +58,44 @@ export function WeekScreen() {
         const toPut = results.filter((r) => r.kind === 'assigned').map((r) => r.entry)
         if (toPut.length) await db.plan_entries.bulkPut(toPut)
       })
+
+      const assignedCount = results.filter((r) => r.kind === 'assigned').length
+      if (assignedCount === 0) {
+        setGenSummary(
+          `None of your ${inputs.activeRecipes.length} recipe(s) could be planned for any slot — check that ` +
+            `their meal_slots/prep_min fit your Settings, and that your pantry actually covers their ` +
+            `ingredients (min_coverage in Settings, default 70%).`,
+        )
+      } else if (assignedCount < results.length) {
+        setGenSummary(`Planned ${assignedCount} of ${results.length} slots — the rest had nothing that fit in stock.`)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong generating the plan.')
     } finally {
       setBusy(false)
     }
   }
 
   async function clearSlot(entry: PlanEntry) {
-    await db.plan_entries.delete(entry.id)
+    try {
+      await db.plan_entries.delete(entry.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not clear that slot.')
+    }
   }
 
   async function toggleLock(entry: PlanEntry) {
-    await db.plan_entries.update(entry.id, { locked: !entry.locked })
+    try {
+      await db.plan_entries.update(entry.id, { locked: !entry.locked })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update that slot.')
+    }
   }
 
   async function swapSlot(cell: WeekCell) {
     if (!cell.entry) return
     setBusy(true)
+    setError(null)
     try {
       const inputs = await loadPlannerInputs()
       const pastEntries = await db.plan_entries.where('date').below(cell.date).toArray()
@@ -74,7 +112,11 @@ export function WeekScreen() {
       })
       if (best) {
         await db.plan_entries.update(cell.entry.id, { recipe_id: best.recipe.id })
+      } else {
+        setGenSummary('No other recipe fits this slot right now.')
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not swap that slot.')
     } finally {
       setBusy(false)
     }
@@ -90,13 +132,41 @@ export function WeekScreen() {
           disabled={busy}
           className="rounded-md bg-green-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {hasAnyEntries ? 'Regenerate' : 'Generate plan'}
+          {busy ? 'Working…' : hasAnyEntries ? 'Regenerate' : 'Generate plan'}
         </button>
       </div>
 
       <p className="text-xs text-stone-400">
         Locked and already-cooked slots are kept as-is. Everything else is recomputed from what's actually in stock.
       </p>
+
+      {activeRecipeCount === 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-medium">No recipes yet.</p>
+          <p className="mt-1 text-amber-700">
+            The planner has nothing to choose from. Go to More → Recipes and paste in a few you actually cook, then
+            come back and generate.
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start justify-between gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="text-red-500">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {genSummary && (
+        <div className="flex items-start justify-between gap-2 rounded-md border border-stone-300 bg-stone-50 p-3 text-sm text-stone-600">
+          <span>{genSummary}</span>
+          <button type="button" onClick={() => setGenSummary(null)} className="text-stone-400">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {weekDates.map((date) => (
